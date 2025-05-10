@@ -103,7 +103,7 @@ pipeline {
                 withDockerRegistry(credentialsId: 'registry_github', url: 'https://ghcr.io'){
                     sh '''
                         docker stop flask-app-dev || true && docker rm flask-app-dev || true
-                        docker run -d --name flask-app-dev ghcr.io/sencoinsn/${DOCKER_IMAGE}:${DOCKER_TAG}
+                        docker run -d -p 8085:8085 --name flask-app-dev ghcr.io/sencoinsn/${DOCKER_IMAGE}:${DOCKER_TAG}
                     '''
                 }
             }
