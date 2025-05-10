@@ -18,7 +18,7 @@ RUN pip3 install -r ${HOME}/requirements.txt
 # Copie des fichiers sources
 COPY app/ ${HOME}/
 
-# Exposition du port de l'application
+# Exposition du port de l'application sur le conteneur
 EXPOSE 8085
 
 # Indication de la commande de démarrage de l'application lorsque l'image sera en execution
