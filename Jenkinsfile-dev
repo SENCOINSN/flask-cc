@@ -82,13 +82,18 @@ pipeline {
         // }
 
         stage('push to github registry'){
-             withDockerRegistry(credentialsId: 'registry_github', url: 'https://ghcr.io'){
+            steps{
+                script{
+                    withDockerRegistry(credentialsId: 'registry_github', url: 'https://ghcr.io'){
                 sh '''
                     docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ghcr.io/sencoinsn/${DOCKER_IMAGE}:${DOCKER_TAG}
                     docker push ghcr.io/sencoinsn/${DOCKER_IMAGE}:${DOCKER_TAG}
                 '''
              
              }
+        }
+        }
+             
         }
 
         // Déploiement de l'image en environnement de développement (port 8085)
