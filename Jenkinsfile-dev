@@ -89,7 +89,7 @@ pipeline {
                     docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ghcr.io/sencoinsn/${DOCKER_IMAGE}:${DOCKER_TAG}
                     docker push ghcr.io/sencoinsn/${DOCKER_IMAGE}:${DOCKER_TAG}
                 '''
-             
+            
              }
         }
         }
