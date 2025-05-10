@@ -5,7 +5,7 @@ pipeline {
 
     environment {
     	// Répertoire d'installation du scanner SonarQube déclaré dans Jenkins
-    	SCANNER_HOME = tool 'sonar-lcf'
+    	SCANNER_HOME = tool 'sonarqube'
 
     	// Nom de base de l'image Docker de l'application
     	DOCKER_IMAGE = 'flaskapp-image'
@@ -39,7 +39,7 @@ pipeline {
         // Analyse de la qualité du code et du coverage avec SonarQube
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv(credentialsId: 'sonar', installationName: 'Sonar') {
+                withSonarQubeEnv(credentialsId: 'credentials-sonarqube', installationName: 'sencoin-sonarqube') {
                     sh "${SCANNER_HOME}/bin/sonar-scanner"
                 }
             }
@@ -65,48 +65,105 @@ pipeline {
         }
 
         // Push de l'image Docker vers le registre Harbor avec authentification
-        stage('Push to Harbor') {
-            steps {
-                withCredentials([usernamePassword(
-                    credentialsId: "token-harbor", 
-                    usernameVariable: "DOCKER_USER", 
-                    passwordVariable: "DOCKER_PASSWORD"
-                )]) {
-                    sh '''
-                        echo "$DOCKER_PASSWORD" | docker login registry.lcf.io -u "$DOCKER_USER" --password-stdin
-                        docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} registry.lcf.io/flask-app/${DOCKER_IMAGE}:${DOCKER_TAG}
-                        docker push registry.lcf.io/flask-app/${DOCKER_IMAGE}:${DOCKER_TAG}
-                    '''
-                }
-            }
+        // stage('Push to Harbor') {
+        //     steps {
+        //         withCredentials([usernamePassword(
+        //             credentialsId: "token-harbor", 
+        //             usernameVariable: "DOCKER_USER", 
+        //             passwordVariable: "DOCKER_PASSWORD"
+        //         )]) {
+        //             sh '''
+        //                 echo "$DOCKER_PASSWORD" | docker login registry.lcf.io -u "$DOCKER_USER" --password-stdin
+        //                 docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} registry.lcf.io/flask-app/${DOCKER_IMAGE}:${DOCKER_TAG}
+        //                 docker push registry.lcf.io/flask-app/${DOCKER_IMAGE}:${DOCKER_TAG}
+        //             '''
+        //         }
+        //     }
+        // }
+
+        stage('push to github registry'){
+             withDockerRegistry(credentialsId: 'registry_github', url: 'https://ghcr.io'){
+                sh '''
+                    docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ghcr.io/sencoinsn/${DOCKER_IMAGE}:${DOCKER_TAG}
+                    docker push ghcr.io/sencoinsn/${DOCKER_IMAGE}:${DOCKER_TAG}
+                '''
+             
+             }
         }
 
         // Déploiement de l'image en environnement de développement (port 8085)
         stage('Simulate Dev Deployment') {
-            steps {
-                sh '''
-                    docker stop flask-app-dev || true && docker rm flask-app-dev || true
-                    docker run -d --name flask-app-dev --network frontend registry.lcf.io/flask-app/${DOCKER_IMAGE}:${DOCKER_TAG}
-                '''
+           steps{
+            script{
+                withDockerRegistry(credentialsId: 'registry_github', url: 'https://ghcr.io'){
+                    sh '''
+                        docker stop flask-app-dev || true && docker rm flask-app-dev || true
+                        docker run -d --name flask-app-dev ghcr.io/sencoinsn/${DOCKER_IMAGE}:${DOCKER_TAG}
+                    '''
+                }
             }
+           }
+            
+
         }
     }
+
+    // post {
+    //     // Affichage d'un message de succès dans Jenkins
+    //     success {
+    //         echo "✅ Déploiement en DEV terminé"
+    //     }
+
+    //     // Affichage d'un message d'échec dans Jenkins
+    //     failure {
+    //         echo "❌ Échec du déploiement en DEV"
+    //     }
+
+    //     // Envoi d'une notification Slack dans tous les cas (succès ou échec)
+    //     always {
+    //         slackSend channel: "jenkins-lcf",
+    //             message: "🛠️  Pipeline: *${env.JOB_NAME}* #${env.BUILD_NUMBER} | 🔗 <${env.BUILD_URL}|Voir build> | *Statut:* ${currentBuild.currentResult}"
+    //     }
+    // }
 
     post {
-        // Affichage d'un message de succès dans Jenkins
-        success {
-            echo "✅ Déploiement en DEV terminé"
+           always {
+             script {
+             def jobName= env.JOB_NAME
+             def buildNumber = env.BUILD_NUMBER
+             def pipelineStatus = currentBuild.result ?: 'UNKNOWN'
+             def bannerColor = pipelineStatus.toUpperCase() == 'SUCCESS' ? 'green' : 'red'
+             def body= """
+                         <html>
+                         <body>
+                         <div style="border: 4px solid ${bannerColor}; padding:
+                         10px;">
+                         10px;">
+                         ${pipelineStatus.toUpperCase()}</h3>
+                         </div>
+                         <h2>${jobName}-PROD- Build
+                         ${buildNumber}</h2>
+                         <div style="background-color:
+                         ${bannerColor}; padding:
+                         <h3 style="color: white;">Pipeline
+                         Status:
+                         <p>Check the <a href="${BUILD_URL}">console
+                         output</a>.</p>
+                         </div>
+                         </body>
+                         </html>
+                         """
+                 emailext (
+                 subject: "${jobName}- Build ${buildNumber}${pipelineStatus.toUpperCase()}",
+                 body: body,
+                 to:
+                 'seyeadam1@gmail.com',
+                 from: 'jenkins@example.com',
+                 replyTo: 'jenkins@example.com',
+                 mimeType: 'text/html',
+                 attachmentsPattern: 'trivy-report.txt'
+                 )
+          }
         }
-
-        // Affichage d'un message d'échec dans Jenkins
-        failure {
-            echo "❌ Échec du déploiement en DEV"
-        }
-
-        // Envoi d'une notification Slack dans tous les cas (succès ou échec)
-        always {
-            slackSend channel: "jenkins-lcf",
-                message: "🛠️  Pipeline: *${env.JOB_NAME}* #${env.BUILD_NUMBER} | 🔗 <${env.BUILD_URL}|Voir build> | *Statut:* ${currentBuild.currentResult}"
-        }
-    }
+     }
 }

@@ -19,7 +19,7 @@ RUN pip3 install -r ${HOME}/requirements.txt
 COPY app/ ${HOME}/
 
 # Exposition du port de l'application
-EXPOSE 8000
+EXPOSE 8085
 
 # Indication de la commande de démarrage de l'application lorsque l'image sera en execution
-CMD ["gunicorn","--workers=1" ,"--timeout=3600", "--bind", "0.0.0.0:8000","app:app"]
+CMD ["gunicorn","--workers=1" ,"--timeout=3600", "--bind", "0.0.0.0:8085","app:app"]
